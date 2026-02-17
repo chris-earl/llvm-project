@@ -1999,6 +1999,62 @@ static void CheckFree(evaluate::ActualArguments &arguments,
   }
 }
 
+static void CheckSystemClockMultipleKinds(bool isError,
+    evaluate::ActualArguments &arguments,
+    evaluate::FoldingContext foldingContext) {
+  std::optional<int> commonKind;
+  if (arguments.size() < 2)
+    return;
+  int count = arguments.size();
+  for (int i{0}; i < count; ++i) {
+    if (arguments[i]) {
+      auto dyType{arguments[i]->GetType()};
+      if (dyType && dyType->category() == TypeCategory::Integer) {
+        if (!commonKind) {
+          commonKind = dyType->kind();
+        } else if (*commonKind != dyType->kind()) {
+          if (isError) {
+            foldingContext.messages().Say(arguments[i]->sourceLocation(),
+                "Integer arguments to SYSTEM_CLOCK must be have the same kind. Given %d and %d"_err_en_US,
+                *commonKind, (int)dyType->kind());
+          } else {
+            foldingContext.Warn(common::UsageWarning::SystemClockMultipleKinds,
+                arguments[i]->sourceLocation(),
+                "Integer arguments to SYSTEM_CLOCK should have the same kind. Given %d and %d"_warn_en_US,
+                *commonKind, (int)dyType->kind());
+          }
+        }
+      }
+    }
+  }
+}
+
+static void CheckSystemClockMinSize(bool isError,
+    evaluate::ActualArguments &arguments,
+    evaluate::FoldingContext foldingContext) {
+  int defaultInt{
+      foldingContext.defaults().GetDefaultKind(TypeCategory::Integer)};
+  int count = arguments.size();
+  for (int i{0}; i < count; ++i) {
+    if (arguments[i]) {
+      auto dyType{arguments[i]->GetType()};
+      if (dyType && dyType->category() == TypeCategory::Integer &&
+          dyType->kind() < defaultInt) {
+        if (isError) {
+          foldingContext.messages().Say(arguments[i]->sourceLocation(),
+              "Integer argument to SYSTEM_CLOCK must be an integer with kind >= %d. Given %d"_err_en_US,
+              defaultInt, dyType->kind());
+        } else {
+          foldingContext.Warn(common::UsageWarning::SystemClockMinSize,
+              arguments[i]->sourceLocation(),
+              "Integer argument to SYSTEM_CLOCK should be an integer with kind >= %d. Given %d"_warn_en_US,
+              defaultInt, dyType->kind());
+        }
+      }
+    }
+  }
+}
+
 // MOVE_ALLOC (F'2023 16.9.147)
 static void CheckMove_Alloc(evaluate::ActualArguments &arguments,
     parser::ContextualMessages &messages) {
@@ -2300,6 +2356,18 @@ static void CheckSpecificIntrinsic(const characteristics::Procedure &proc,
     CheckTransfer(arguments, context, scope);
   } else if (intrinsic.name == "free") {
     CheckFree(arguments, context.foldingContext().messages());
+  } else if (intrinsic.name == "system_clock") {
+    bool isError = context.langOptions().getFortranStandard() >=
+        common::LangOptions::Fortran2023;
+    if (isError ||
+        context.ShouldWarn(common::UsageWarning::SystemClockMultipleKinds)) {
+      CheckSystemClockMultipleKinds(
+          isError, arguments, context.foldingContext());
+    }
+    if (isError ||
+        context.ShouldWarn(common::UsageWarning::SystemClockMinSize)) {
+      CheckSystemClockMinSize(isError, arguments, context.foldingContext());
+    }
   }
 }
 
