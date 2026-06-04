@@ -1044,8 +1044,6 @@ static bool parseDiagArgs(CompilerInvocation &res, llvm::opt::ArgList &args,
   if (args.hasArg(clang::options::OPT_pedantic)) {
     features.WarnOnAllNonstandard();
     features.WarnOnAllUsage();
-    res.setEnableConformanceChecks();
-    res.setEnableUsageChecks();
   }
 
   // -Werror option
@@ -1084,7 +1082,6 @@ static bool parseDiagArgs(CompilerInvocation &res, llvm::opt::ArgList &args,
   // -w
   if (args.hasArg(clang::options::OPT_w)) {
     features.DisableAllWarnings();
-    res.setDisableWarnings();
   }
 
   // Default to off for `flang -fc1`.
@@ -1193,7 +1190,6 @@ static bool parseDialectArgs(CompilerInvocation &res, llvm::opt::ArgList &args,
     auto standard = args.getLastArgValue(clang::options::OPT_std_EQ);
     // We only allow f2018 as the given standard
     if (standard == "f2018") {
-      res.setEnableConformanceChecks();
       res.getFrontendOpts().features.WarnOnAllNonstandard();
     } else {
       const unsigned diagID =
